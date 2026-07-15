@@ -8,12 +8,10 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; line-height: 1.6; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
         h1 { font-size: 1.5rem; color: #2c3e50; margin-bottom: 20px; text-align: center; }
-
         .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
         .card h2 { font-size: 1rem; color: #555; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-
         .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
         .form-group { flex: 1; min-width: 120px; }
         .form-group label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 4px; }
@@ -23,17 +21,18 @@
         .btn-primary { background: #3498db; color: #fff; }
         .btn-primary:hover { background: #2980b9; }
         .btn-danger { background: #e74c3c; color: #fff; padding: 4px 10px; font-size: 0.8rem; }
-        .btn-danger:hover { background: #c0392b; }
-
-        .chart-wrapper { position: relative; height: 350px; }
-        #growthChart { width: 100% !important; height: 100% !important; }
-
+        .chart-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .chart-controls label { font-size: 0.85rem; color: #555; }
+        .chart-controls select, .chart-controls input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; }
+        .chart-wrapper { position: relative; height: 420px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; font-weight: 600; color: #555; }
         tr:hover { background: #f0f7ff; }
-        .record-actions { display: flex; gap: 4px; }
         .empty-state { text-align: center; color: #999; padding: 40px 0; }
+        .tab-bar { display: flex; gap: 4px; margin-bottom: 10px; }
+        .tab-bar button { padding: 6px 16px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.85rem; }
+        .tab-bar button.active { background: #3498db; color: #fff; border-color: #3498db; }
     </style>
 </head>
 <body>
@@ -49,15 +48,15 @@
             </div>
             <div class="form-group">
                 <label>身高 (cm)</label>
-                <input type="number" name="height" step="0.1" placeholder="e.g. 75.5" required>
+                <input type="number" name="height" step="0.1" required>
             </div>
             <div class="form-group">
                 <label>体重 (kg)</label>
-                <input type="number" name="weight" step="0.1" placeholder="e.g. 9.2" required>
+                <input type="number" name="weight" step="0.1" required>
             </div>
             <div class="form-group">
                 <label>头围 (cm)</label>
-                <input type="number" name="headCircumference" step="0.1" placeholder="选填">
+                <input type="number" name="headCircumference" step="0.1">
             </div>
             <button type="submit" class="btn btn-primary">保存</button>
         </form>
@@ -65,6 +64,16 @@
 
     <div class="card">
         <h2>成长曲线</h2>
+        <p style="font-size:0.75rem;color:#999;margin-bottom:8px">虚线 = WHO标准 (P3/P50/P97) | 实线 = 宝宝 | 紫色点划线 = 预测</p>
+        <div class="tab-bar">
+            <button class="active" data-chart="height">身高</button>
+            <button data-chart="weight">体重</button>
+            <button data-chart="head">头围</button>
+        </div>
+        <div class="chart-controls">
+            <label>预测月数：<input type="number" id="predictMonths" value="12" min="1" max="36" style="width:60px"></label>
+            <button id="refreshPrediction" class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem">更新</button>
+        </div>
         <div class="chart-wrapper">
             <canvas id="growthChart"></canvas>
         </div>
@@ -75,29 +84,25 @@
         <table>
             <thead>
             <tr>
-                <th>日期</th>
-                <th>身高 (cm)</th>
-                <th>体重 (kg)</th>
-                <th>头围 (cm)</th>
-                <th>备注</th>
-                <th>操作</th>
+                <th>日期</th><th>月龄</th><th>身高 (cm)</th><th>体重 (kg)</th><th>头围 (cm)</th><th>备注</th><th>操作</th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="r : ${records}">
-                <td th:text="${r.recordDate}">2024-01-01</td>
-                <td th:text="${r.height}">75.5</td>
-                <td th:text="${r.weight}">9.2</td>
+                <td th:text="${r.recordDate}">-</td>
+                <td th:text="${r.notes} ?: '-'">-</td>
+                <td th:text="${r.height}">-</td>
+                <td th:text="${r.weight}">-</td>
                 <td th:text="${r.headCircumference} ?: '-'">-</td>
-                <td th:text="${r.notes} ?: ''"></td>
-                <td class="record-actions">
+                <td th:text="${r.notes} ?: ''">-</td>
+                <td>
                     <form th:action="@{/delete/{id}(id=${r.id})}" method="post" style="display:inline">
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除这条记录？')">删除</button>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除？')">删除</button>
                     </form>
                 </td>
             </tr>
             <tr th:if="${#lists.isEmpty(records)}">
-                <td colspan="6" class="empty-state">还没有记录，快来添加第一条吧！</td>
+                <td colspan="7" class="empty-state">还没有记录</td>
             </tr>
             </tbody>
         </table>
@@ -106,59 +111,138 @@
 
 <script>
 const records = /*[[${records}]]*/ [];
-const labels = records.map(r => r.recordDate);
-const heights = records.map(r => r.height);
-const weights = records.map(r => r.weight);
-const headCircs = records.map(r => r.headCircumference);
+
+// 以第一条记录（新生儿）为月龄0的基准
+let birthDate = null;
+if (records.length > 0) {
+    const sorted = [...records].sort((a,b) => new Date(a.recordDate) - new Date(b.recordDate));
+    birthDate = new Date(sorted[0].recordDate);
+}
+
+function calcMonthAge(dateStr) {
+    if (!birthDate) return 0;
+    const d = new Date(dateStr);
+    return (d.getFullYear() - birthDate.getFullYear()) * 12 + (d.getMonth() - birthDate.getMonth());
+}
 
 let chart = null;
-if (records.length > 0) {
+let standardsData = null;
+let predictionData = null;
+let currentView = 'height';
+
+async function loadData() {
+    const [stdRes, predRes] = await Promise.all([
+        fetch('/api/standards'),
+        fetch('/api/standards/prediction?monthsAhead=12')
+    ]);
+    standardsData = await stdRes.json();
+    predictionData = await predRes.json();
+    renderChart('height');
+}
+
+function renderChart(view) {
+    const ctx = document.getElementById('growthChart').getContext('2d');
+    if (chart) chart.destroy();
+
+    const fieldMap = {height:'height', weight:'weight', head:'headCircumference'};
+    const field = fieldMap[view];
+    if (!standardsData || !standardsData[field]) return;
+
+    const std = standardsData[field];
+    const label = view==='height'?'身高 (cm)':view==='weight'?'体重 (kg)':'头围 (cm)';
+
+    const p3Points = std.map(s => ({x: s.monthAge, y: s.p3}));
+    const p50Points = std.map(s => ({x: s.monthAge, y: s.p50}));
+    const p97Points = std.map(s => ({x: s.monthAge, y: s.p97}));
+
+    const childPoints = [...records]
+        .map(r => ({x: calcMonthAge(r.recordDate), y: r[field]}))
+        .filter(d => d.y != null && !isNaN(d.x))
+        .sort((a,b) => a.x - b.x);
+
+    const pred = predictionData?.[field]?.predicted || [];
+    const predPoints = pred.map(p => ({x: p.monthAge, y: p.value}));
+
     const datasets = [
-        {
-            label: '身高 (cm)',
-            data: heights,
-            borderColor: '#3498db',
-            backgroundColor: 'rgba(52,152,219,0.1)',
-            tension: 0.3,
-            fill: true
-        },
-        {
-            label: '体重 (kg)',
-            data: weights,
-            borderColor: '#e74c3c',
-            backgroundColor: 'rgba(231,76,60,0.1)',
-            tension: 0.3,
-            fill: true,
-            yAxisID: 'y1'
-        }
+        {label: 'P97上限', data: p97Points, borderColor:'rgba(231,76,60,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:false},
+        {label: 'P50中位数', data: p50Points, borderColor:'rgba(46,204,113,0.5)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'},
+        {label: 'P3下限', data: p3Points, borderColor:'rgba(52,152,219,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'}
     ];
 
-    if (headCircs.some(h => h != null)) {
+    if (childPoints.length > 0) {
         datasets.push({
-            label: '头围 (cm)',
-            data: headCircs,
-            borderColor: '#2ecc71',
-            backgroundColor: 'rgba(46,204,113,0.1)',
-            tension: 0.3,
-            fill: true
+            label: '宝宝 '+label,
+            data: childPoints,
+            borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.15)',
+            pointBackgroundColor:'#e74c3c', pointRadius:5, pointHoverRadius:7,
+            tension:0.3, fill:false, borderWidth:2.5
         });
     }
 
-    chart = new Chart(document.getElementById('growthChart'), {
+    if (predPoints.length > 0) {
+        datasets.push({
+            label: '预测趋势',
+            data: predPoints,
+            borderColor:'#9b59b6', borderDash:[8,4],
+            pointRadius:4, pointStyle:'rectRot', tension:0.3, fill:false, borderWidth:2
+        });
+    }
+
+    chart = new Chart(ctx, {
         type: 'line',
-        data: { labels: labels, datasets: datasets },
+        data: { datasets },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: { legend: { position: 'top' } },
+            responsive: true, maintainAspectRatio: false,
+            interaction: {mode:'index', intersect:false},
+            plugins: {
+                legend: {position:'top', labels:{usePointStyle:true, padding:15, font:{size:11}}},
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const v = ctx.parsed.y;
+                            const u = view==='weight'?' kg':' cm';
+                            return ctx.dataset.label + ': ' + v + u;
+                        }
+                    }
+                }
+            },
             scales: {
-                y: { title: { display: true, text: '身高 (cm)' }, beginAtZero: false },
-                y1: { position: 'right', title: { display: true, text: '体重 (kg)' }, beginAtZero: false, grid: { drawOnChartArea: false } }
+                x: {
+                    type: 'linear',
+                    title: {display:true, text:'月龄', font:{size:12}},
+                    ticks: {
+                        maxTicksLimit: 18,
+                        callback: function(v) { return v + '个月'; }
+                    },
+                    min: 0,
+                    max: Math.max(72, ...childPoints.map(d=>d.x)) + 12
+                },
+                y: {
+                    title: {display:true, text: label, font:{size:12}},
+                    beginAtZero: false
+                }
             }
         }
     });
 }
+
+document.querySelectorAll('[data-chart]').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('[data-chart]').forEach(b=>b.classList.remove('active'));
+        this.classList.add('active');
+        currentView = this.dataset.chart;
+        renderChart(currentView);
+    });
+});
+
+document.getElementById('refreshPrediction').addEventListener('click', async function() {
+    const months = parseInt(document.getElementById('predictMonths').value) || 12;
+    const res = await fetch('/api/standards/prediction?monthsAhead='+months);
+    predictionData = await res.json();
+    renderChart(currentView);
+});
+
+loadData();
 </script>
 </body>
 </html>
