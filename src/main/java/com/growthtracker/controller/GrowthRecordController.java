@@ -5,7 +5,6 @@ import com.growthtracker.repository.GrowthRecordRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/records")
@@ -48,12 +47,17 @@ public class GrowthRecordController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteRecord(@PathVariable Long id) {
-        if (repository.existsById(id)) {
-            repository.deleteById(id);
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.notFound().build();
+   @DeleteMapping("/{id}")
+   public ResponseEntity<Void> deleteRecord(@PathVariable Long id) {
+       if (repository.existsById(id)) {
+           repository.deleteById(id);
+           return ResponseEntity.noContent().build();
+       }
+       return ResponseEntity.notFound().build();
+   }
+
+    @PostMapping("/batch")
+    public List<GrowthRecord> batchImport(@RequestBody List<GrowthRecord> records) {
+        return repository.saveAll(records);
     }
 }
