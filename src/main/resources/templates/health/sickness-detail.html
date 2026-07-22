@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'就医详情 - ' + ${sick.symptoms}">就医详情</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f7fa;color:#333;line-height:1.6}
+        .container{max-width:960px;margin:0 auto;padding:20px}
+        h1{font-size:1.4rem;color:#2c3e50;margin-bottom:15px}
+        .nav{margin-bottom:15px}
+        .nav a{color:#3498db;text-decoration:none;font-size:.9rem}
+        .nav a:hover{text-decoration:underline}
+        .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px;margin-bottom:20px}
+        .card h2{font-size:1rem;color:#555;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:8px}
+        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9rem}
+        .info-grid .label{color:#888;font-size:.8rem}
+        .info-grid .value{font-weight:500;margin-bottom:8px}
+        .form-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+        .form-group{flex:1;min-width:100px}
+        .form-group label{display:block;font-size:.8rem;color:#666;margin-bottom:3px}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:7px 9px;border:1px solid #ddd;border-radius:4px;font-size:.9rem}
+        .form-group select{background:#fff}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#3498db}
+        .btn{padding:7px 16px;border:none;border-radius:4px;cursor:pointer;font-size:.85rem}
+        .btn-primary{background:#3498db;color:#fff}
+        .btn-primary:hover{background:#2980b9}
+        .btn-danger{background:#e74c3c;color:#fff;padding:3px 8px;font-size:.75rem;border:none;border-radius:3px;cursor:pointer}
+        .btn-sm{padding:4px 10px;font-size:.78rem}
+        table{width:100%;border-collapse:collapse;font-size:.82rem}
+        th,td{padding:8px 6px;text-align:left;border-bottom:1px solid #eee}
+        th{background:#f8f9fa;font-weight:600;color:#555;white-space:nowrap}
+        tr:hover{background:#f0f7ff}
+        .empty{text-align:center;color:#999;padding:20px 0}
+        .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:.78rem;font-weight:600}
+        .badge-active{background:#fff3f0;color:#e74c3c;border:1px solid #e74c3c}
+        .badge-done{background:#f0faf5;color:#27ae60;border:1px solid #27ae60}
+        .tag-skin{background:#fff3cd;color:#856404;padding:2px 6px;border-radius:3px;font-size:.72rem;margin-left:4px}
+        .checkbox-group{display:flex;align-items:center;gap:6px;padding-top:20px}
+        .checkbox-group input[type=checkbox]{width:auto}
+        .checkbox-group label{font-size:.8rem;color:#666;margin:0;display:inline}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a href="/health/sickness">← 就医记录</a>
+    </div>
+
+    <h1 th:text="'🏥 ' + ${sick.symptoms}">症状</h1>
+    <span th:if="${sick.endDate == null}" class="badge badge-active">治疗中</span>
+    <span th:unless="${sick.endDate == null}" class="badge badge-done">已痊愈</span>
+
+    <div class="card" style="margin-top:15px">
+        <h2>基本信息</h2>
+        <div class="info-grid">
+            <div><div class="label">发病日期</div><div class="value" th:text="${sick.startDate}">-</div></div>
+            <div><div class="label">痊愈日期</div><div class="value" th:text="${sick.endDate} ?: '尚未痊愈'">-</div></div>
+            <div><div class="label">症状</div><div class="value" th:text="${sick.symptoms}">-</div></div>
+            <div><div class="label">就诊医院</div><div class="value" th:text="${sick.hospital} ?: '未记录'">-</div></div>
+            <div style="grid-column:1/-1"><div class="label">医生诊断</div><div class="value" th:text="${sick.diagnosis} ?: '暂无诊断'">-</div></div>
+            <div style="grid-column:1/-1"><div class="label">备注</div><div class="value" th:text="${sick.notes} ?: ''">-</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>更新信息</h2>
+        <form th:action="@{/health/sickness/{id}/update(id=${sick.id})}" method="post" class="form-row">
+            <div class="form-group"><label>痊愈日期</label><input type="date" name="endDate" th:value="${sick.endDate}"></div>
+            <div class="form-group" style="flex:2"><label>医生诊断</label><input type="text" name="diagnosis" th:value="${sick.diagnosis}" placeholder="医生诊断结果"></div>
+            <div class="form-group"><label>医院</label><input type="text" name="hospital" th:value="${sick.hospital}" placeholder="医院名称"></div>
+            <div class="form-group" style="flex:1;min-width:200px"><label>备注</label><input type="text" name="notes" th:value="${sick.notes}" placeholder="备注"></div>
+            <button type="submit" class="btn btn-primary">更新</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>用药记录</h2>
+        <div style="overflow-x:auto">
+        <table>
+            <thead><tr>
+                <th>药品</th><th>规格</th><th>用量</th><th>用法</th><th>频次</th>
+                <th>开始</th><th>结束</th><th>医嘱</th><th>操作</th>
+            </tr></thead>
+            <tbody>
+                <tr th:each="m : ${sick.medications}">
+                    <td th:text="${m.medicationName}">-</td>
+                    <td th:text="${m.specification} ?: '-'">-</td>
+                    <td th:text="${m.dosage} ?: '-'">-</td>
+                    <td th:text="${m.usageMethod} ?: '-'">-</td>
+                    <td th:text="${m.frequency} ?: '-'">-</td>
+                    <td th:text="${m.startDate} ?: '-'">-</td>
+                    <td th:text="${m.endDate} ?: '-'">-</td>
+                    <td>
+                        <span th:if="${m.skinTest == true}" class="tag-skin">⚠需皮试</span>
+                        <span th:text="${m.instructions} ?: ''">-</span>
+                    </td>
+                    <td><form th:action="@{/health/medication/{id}/delete(id=${m.id})}" method="post"><button type="submit" class="btn-danger">删除</button></form></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(sick.medications)}"><td colspan="9" class="empty">还没有用药记录</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>添加用药</h2>
+        <form th:action="@{/health/sickness/{id}/medication/add(id=${sick.id})}" method="post">
+            <div class="form-row mb-2">
+                <div class="form-group" style="flex:1.5"><label>药品名称 *</label><input type="text" name="medicationName" placeholder="药品名" required></div>
+                <div class="form-group"><label>规格</label><input type="text" name="specification" placeholder="如 0.2g/片"></div>
+                <div class="form-group"><label>每次用量 *</label><input type="text" name="dosage" placeholder="如 5ml、1粒" required></div>
+                <div class="form-group"><label>用法</label>
+                    <select name="usageMethod">
+                        <option value="">选择用法</option>
+                        <option value="口服">口服</option>
+                        <option value="外用">外用</option>
+                        <option value="雾化">雾化</option>
+                        <option value="注射">注射</option>
+                        <option value="滴眼">滴眼</option>
+                        <option value="滴鼻">滴鼻</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>频次 *</label><input type="text" name="frequency" placeholder="如 3次/天" required></div>
+                <div class="form-group"><label>开始日期</label><input type="date" name="startDate"></div>
+                <div class="form-group"><label>结束日期</label><input type="date" name="endDate"></div>
+                <div class="form-group" style="flex:2"><label>医嘱说明</label><input type="text" name="instructions" placeholder="如 饭后服用、多喝水"></div>
+                <div class="checkbox-group">
+                    <input type="checkbox" name="skinTest" id="skinTest" value="true">
+                    <label for="skinTest">需皮试</label>
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

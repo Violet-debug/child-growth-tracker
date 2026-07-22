@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>补给记录</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f7fa;color:#333;line-height:1.6}
+        .container{max-width:900px;margin:0 auto;padding:20px}
+        h1{font-size:1.4rem;color:#2c3e50;margin-bottom:15px;text-align:center}
+        .nav{margin-bottom:15px;text-align:center}
+        .nav a{color:#3498db;text-decoration:none;font-size:.85rem;margin:0 8px}
+        .nav a:hover{text-decoration:underline}
+        .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px;margin-bottom:20px}
+        .card h2{font-size:1rem;color:#555;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:8px}
+        .form-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+        .form-group{flex:1;min-width:120px}
+        .form-group label{display:block;font-size:.8rem;color:#666;margin-bottom:3px}
+        .form-group input{width:100%;padding:7px 9px;border:1px solid #ddd;border-radius:4px;font-size:.9rem}
+        .form-group input:focus{outline:none;border-color:#27ae60}
+        .btn{padding:7px 16px;border:none;border-radius:4px;cursor:pointer;font-size:.85rem}
+        .btn-primary{background:#27ae60;color:#fff}
+        .btn-danger{background:#e74c3c;color:#fff;padding:3px 8px;font-size:.75rem;border:none;border-radius:3px;cursor:pointer}
+        table{width:100%;border-collapse:collapse;font-size:.82rem}
+        th,td{padding:8px;text-align:left;border-bottom:1px solid #eee}
+        th{background:#f8f9fa;font-weight:600;color:#555}
+        tr:hover{background:#f0faf5}
+        .empty{text-align:center;color:#999;padding:30px 0}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a href="/health">← 健康管理</a>
+        <a href="/health/sickness">就医记录 →</a>
+    </div>
+    <h1>💊 补给记录</h1>
+
+    <div class="card">
+        <h2>添加记录</h2>
+        <form th:action="@{/health/supplements/add}" method="post" class="form-row">
+            <div class="form-group"><label>日期</label><input type="date" name="recordDate" th:value="${#dates.format(new java.util.Date(), 'yyyy-MM-dd')}"></div>
+            <div class="form-group"><label>名称</label><input type="text" name="supplementName" placeholder="如 钙、维生素D" required></div>
+            <div class="form-group"><label>品牌</label><input type="text" name="brand" placeholder="品牌名"></div>
+            <div class="form-group"><label>用量</label><input type="text" name="dosage" placeholder="如 5ml、1粒"></div>
+            <button type="submit" class="btn btn-primary">添加</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>记录列表</h2>
+        <table>
+            <thead><tr><th>日期</th><th>名称</th><th>品牌</th><th>用量</th><th>备注</th><th>操作</th></tr></thead>
+            <tbody>
+                <tr th:each="r : ${supplements}">
+                    <td th:text="${r.recordDate}">-</td>
+                    <td th:text="${r.supplementName}">-</td>
+                    <td th:text="${r.brand} ?: '-'">-</td>
+                    <td th:text="${r.dosage} ?: '-'">-</td>
+                    <td th:text="${r.notes} ?: ''">-</td>
+                    <td><form th:action="@{/health/supplements/delete/{id}(id=${r.id})}" method="post"><button type="submit" class="btn-danger">删除</button></form></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(supplements)}"><td colspan="6" class="empty">还没有记录</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

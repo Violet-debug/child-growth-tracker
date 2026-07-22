@@ -15,11 +15,11 @@
         .form-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
         .form-group{flex:1;min-width:120px}
         .form-group label{display:block;font-size:.8rem;color:#666;margin-bottom:4px}
-        .form-group input{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:.9rem}
-        .form-group input:focus{outline:none;border-color:#3498db}
+        .form-group input,.form-group select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:.9rem}
+        .form-group select{background:#fff}
+        .form-group input:focus,.form-group select:focus{outline:none;border-color:#3498db}
         .btn{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-size:.9rem}
         .btn-primary{background:#3498db;color:#fff}
-        .btn{padding:8px 20px;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9rem}
         .btn-danger{background:#e74c3c;color:#fff;padding:4px 10px;font-size:.8rem;border:none;border-radius:4px;cursor:pointer}
         .chart-wrapper{position:relative;height:420px}
         table{width:100%;border-collapse:collapse;font-size:.85rem}
@@ -27,15 +27,21 @@
         th{background:#f8f9fa;font-weight:600;color:#555}
         tr:hover{background:#f0f7ff}
         .empty-state{text-align:center;color:#999;padding:40px 0}
-        .tab-bar,.chart-ctrl{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+        .tab-bar,.ctrl-bar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
         .tab-bar button{padding:6px 16px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:.85rem}
         .tab-bar button.active{background:#3498db;color:#fff;border-color:#3498db}
+        .ctrl-bar select{padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:.85rem;background:#fff}
         .note{font-size:.75rem;color:#999;margin-bottom:8px}
+        .tag{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.75rem;margin-left:6px}
+        .tag-green{background:#d4edda;color:#155724}
+        .tag-blue{background:#d1ecf1;color:#0c5460}
+        .tag-orange{background:#fff3cd;color:#856404}
     </style>
 </head>
 <body>
 <div class="container">
     <h1>宝贝成长记录</h1>
+    <div style="text-align:center;margin-bottom:15px"><a href="/health" style="color:#27ae60;text-decoration:none;font-size:.9rem">🏥 健康管理 →</a></div>
 
     <div class="card">
         <h2>添加记录</h2>
@@ -50,41 +56,53 @@
 
     <div class="card">
         <h2>成长曲线</h2>
-        <p class="note">虚线: WHO标准(P3/P50/P97) | 红色: 宝宝 | 紫色点划线: 预测</p>
+        <div class="ctrl-bar">
+            <select id="standardSelect" onchange="onStandardChange()">
+                <option value="CN_2022">卫健委 WS/T 423-2022</option>
+                <option value="WHO_2006">WHO 2006 (国际标准)</option>
+            </select>
+            <select id="genderSelect" onchange="onStandardChange()">
+                <option value="FEMALE">女孩</option>
+                <option value="MALE">男孩</option>
+            </select>
+            <span id="standardNote" class="note"></span>
+        </div>
         <div class="tab-bar">
             <button class="active" onclick="switchChart('height')">身高</button>
             <button onclick="switchChart('weight')">体重</button>
             <button onclick="switchChart('head')">头围</button>
         </div>
-        <div class="chart-ctrl">
+        <div class="ctrl-bar">
             <label>预测月数：<input type="number" id="predictMonths" value="12" min="1" max="36" style="width:60px;padding:4px;border:1px solid #ddd;border-radius:4px"></label>
-            <button onclick="refreshPrediction()" style="padding:4px 12px;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.8rem">更新</button>
+            <button onclick="refreshPrediction()" style="padding:4px 12px;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.8rem">更新预测</button>
         </div>
         <div class="chart-wrapper"><canvas id="growthChart"></canvas></div>
     </div>
 
     <div class="card">
-        <h2>历史记录</h2>
+        <h2>历史记录 <span style="font-size:.75rem;font-weight:normal;color:#999" id="recordCount"></span></h2>
+        <div style="overflow-x:auto">
         <table>
-            <thead><tr><th>日期</th><th>月龄</th><th>身高(cm)</th><th>体重(kg)</th><th>头围(cm)</th><th>备注</th><th>操作</th></tr></thead>
-            <tbody>
+            <thead><tr><th>日期</th><th>月龄</th><th>身高(cm)</th><th>体重(kg)</th><th>头围(cm)</th><th>百分位</th><th>操作</th></tr></thead>
+            <tbody id="recordBody">
                 <tr th:each="r : ${records}">
                     <td class="rdate" th:text="${r.recordDate}">-</td>
-                    <td th:text="${r.notes} ?: '-'">-</td>
+                    <td class="rage" th:text="${r.notes} ?: '-'">-</td>
                     <td class="rheight" th:text="${r.height}">-</td>
                     <td class="rweight" th:text="${r.weight}">-</td>
                     <td class="rhead" th:text="${r.headCircumference} ?: '-'">-</td>
-                    <td th:text="${r.notes} ?: ''">-</td>
+                    <td class="rpct">-</td>
                     <td><form th:action="@{/delete/{id}(id=${r.id})}" method="post" style="display:inline"><button type="submit" class="btn-danger" onclick="return confirm('确定删除？')">删除</button></form></td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(records)}"><td colspan="7" class="empty-state">还没有记录</td></tr>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 
 <script>
-// 从表格提取数据，完全避开 Thymeleaf 的 JS 序列化问题
+// === 数据提取 ===
 function parseRecords() {
     var rows = document.querySelectorAll('table tbody tr');
     var result = [];
@@ -107,15 +125,14 @@ function parseRecords() {
 }
 
 var records = parseRecords();
-console.log('Parsed records:', records.length, records);
+console.log('Parsed records:', records.length);
 
-// 以最早记录为出生日期
+// 出生日期（取最早记录）
 var birthDate = null;
 if (records.length > 0) {
     var sorted = records.slice().sort(function(a,b){return new Date(a.recordDate)-new Date(b.recordDate);});
     birthDate = new Date(sorted[0].recordDate);
 }
-console.log('Birth date:', birthDate);
 
 function calcMonthAge(dateStr) {
     if (!birthDate) return NaN;
@@ -123,15 +140,66 @@ function calcMonthAge(dateStr) {
     return (d.getFullYear() - birthDate.getFullYear()) * 12 + (d.getMonth() - birthDate.getMonth());
 }
 
-var chart = null, standardsData = null, predictionData = null, curView = 'height';
+var chart = null, curView = 'height';
 
-async function loadData() {
-    try { standardsData = await (await fetch('/api/standards')).json(); } catch(e) { console.error('Std API:', e); }
-    try { predictionData = await (await fetch('/api/standards/prediction?monthsAhead=12')).json(); } catch(e) { console.error('Pred API:', e); }
-    renderChart('height');
+// === 标准相关 ===
+function currentStandard() { return document.getElementById('standardSelect').value; }
+function currentGender() { return document.getElementById('genderSelect').value; }
+
+function standardLabel(s) {
+    return s === 'CN_2022' ? '卫健委 WS/T 423-2022' : 'WHO 2006 (国际标准)';
 }
 
-function renderChart(view) {
+async function loadStandardsData() {
+    var s = currentStandard();
+    var g = currentGender();
+    try {
+        var resp = await fetch('/api/standards?standard=' + s + '&gender=' + g);
+        if (!resp.ok) return null;
+        var data = await resp.json();
+        document.getElementById('standardNote').textContent = '数据源：' + (data.note || standardLabel(s));
+        return data;
+    } catch(e) { console.error('Load standards error:', e); return null; }
+}
+
+// === 百分位计算 ===
+async function calcPercentile(indicator, value, ageMonths) {
+    var s = currentStandard();
+    var g = currentGender();
+    try {
+        var resp = await fetch('/api/standards/percentile?standard=' + s + '&gender=' + g + '&indicator=' + indicator + '&value=' + value + '&ageMonths=' + ageMonths);
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch(e) { return null; }
+}
+
+// 更新表格百分位列
+function updatePercentiles() {
+    var rows = document.querySelectorAll('#recordBody tr');
+    for (var i = 0; i < rows.length; i++) {
+        var tds = rows[i].querySelectorAll('td');
+        if (tds.length < 7) continue;
+        var dateTxt = tds[0].textContent.trim();
+        var heightTxt = tds[2].textContent.trim();
+        var weightTxt = tds[3].textContent.trim();
+        var headTxt = tds[4].textContent.trim();
+        var pctCell = tds[5];
+        if (!pctCell || dateTxt === '-' || heightTxt === '-') continue;
+
+        var age = calcMonthAge(dateTxt);
+        if (isNaN(age)) continue;
+
+        var parts = [];
+        if (heightTxt !== '-') parts.push('H:' + parseFloat(heightTxt).toFixed(1));
+        if (weightTxt !== '-') parts.push('W:' + parseFloat(weightTxt).toFixed(1));
+        if (headTxt && headTxt !== '-') parts.push('C:' + parseFloat(headTxt).toFixed(1));
+        pctCell.textContent = parts.join(' | ');
+        pctCell.style.fontSize = '.75rem';
+    }
+}
+
+// === 图表演示 ===
+async function renderChart(view) {
     var ctx = document.getElementById('growthChart').getContext('2d');
     if (chart) chart.destroy();
     curView = view;
@@ -140,7 +208,8 @@ function renderChart(view) {
     var field = fields[view];
     var label = view==='height'?'身高(cm)':view==='weight'?'体重(kg)':'头围(cm)';
 
-    if (!standardsData || !standardsData[field]) { console.warn('No standards for', field); return; }
+    var standardsData = await loadStandardsData();
+    if (!standardsData || !standardsData[field]) { return; }
 
     var s = standardsData[field];
     var d3 = s.map(function(p){return {x:p.monthAge, y:p.p3};});
@@ -154,15 +223,16 @@ function renderChart(view) {
         if (v != null && !isNaN(a)) child.push({x:a, y:v});
     }
     child.sort(function(a,b){return a.x-b.x;});
-    console.log('Child points for', view, child.length, child);
 
-    var pred = predictionData && predictionData[field] && predictionData[field].predicted;
-    var pp = pred ? pred.map(function(p){return {x:p.monthAge,y:p.value};}) : [];
+    // 获取预测数据
+    var pm = parseInt(document.getElementById('predictMonths').value) || 12;
+    var predResp, pp = [];
+    try { predResp = await fetch('/api/standards/prediction?monthsAhead=' + pm); if (predResp.ok) { var pd = await predResp.json(); if (pd[field] && pd[field].predicted) pp = pd[field].predicted.map(function(p){return {x:p.monthAge,y:p.value};}); } } catch(e) {}
 
     var ds = [
-        {label:'P97上限', data:d97, borderColor:'rgba(231,76,60,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:false},
-        {label:'P50中位数', data:d50, borderColor:'rgba(46,204,113,0.5)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'},
-        {label:'P3下限', data:d3, borderColor:'rgba(52,152,219,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'}
+        {label:'P97 上限', data:d97, borderColor:'rgba(231,76,60,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:false},
+        {label:'P50 中位数', data:d50, borderColor:'rgba(46,204,113,0.5)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'},
+        {label:'P3 下限', data:d3, borderColor:'rgba(52,152,219,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'}
     ];
     if (child.length > 0) ds.push({label:'宝宝 '+label, data:child, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.15)', pointBackgroundColor:'#e74c3c', pointRadius:5, tension:0.3, fill:false, borderWidth:2.5});
     if (pp.length > 0) ds.push({label:'预测趋势', data:pp, borderColor:'#9b59b6', borderDash:[8,4], pointRadius:4, pointStyle:'rectRot', tension:0.3, fill:false, borderWidth:2});
@@ -177,7 +247,7 @@ function renderChart(view) {
             responsive:true, maintainAspectRatio:false,
             plugins:{legend:{position:'top', labels:{usePointStyle:true, padding:15, font:{size:11}}}},
             scales:{
-                x:{type:'linear', title:{display:true, text:'月龄', font:{size:12}}, ticks:{maxTicksLimit:18, callback:function(v){return v+'个月';}}, min:0, max:maxX},
+                x:{type:'linear', title:{display:true, text:'月龄', font:{size:12}}, ticks:{maxTicksLimit:18, callback:function(v){return v+'个月';}}, min:0, max:Math.max(maxX, 36)},
                 y:{title:{display:true, text:label, font:{size:12}}, beginAtZero:false}
             }
         }
@@ -190,13 +260,17 @@ function switchChart(v) {
     renderChart(v);
 }
 
+async function onStandardChange() {
+    await Promise.all([renderChart(curView), updatePercentiles()]);
+}
+
 async function refreshPrediction() {
-    var m = parseInt(document.getElementById('predictMonths').value) || 12;
-    try { predictionData = await (await fetch('/api/standards/prediction?monthsAhead='+m)).json(); } catch(e) {}
     renderChart(curView);
 }
 
-loadData();
+// === 页面加载 ===
+updatePercentiles();
+renderChart('height');
 </script>
 </body>
 </html>

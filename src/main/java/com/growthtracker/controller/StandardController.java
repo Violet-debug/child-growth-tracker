@@ -19,11 +19,32 @@ public class StandardController {
         this.repo = repo;
     }
 
-    @GetMapping
-    public Map<String, Object> getStandards() {
-        return service.getStandards();
+    /** 列出可用标准 */
+    @GetMapping("/list")
+    public List<Map<String, String>> listStandards() {
+        return service.getAvailableStandards();
     }
 
+    /** 获取标准曲线数据 */
+    @GetMapping
+    public Map<String, Object> getStandards(
+            @RequestParam(defaultValue = "WHO_2006") String standard,
+            @RequestParam(defaultValue = "MALE") String gender) {
+        return service.getStandards(standard, gender);
+    }
+
+    /** 计算百分位 */
+    @GetMapping("/percentile")
+    public Map<String, Object> getPercentile(
+            @RequestParam(defaultValue = "WHO_2006") String standard,
+            @RequestParam(defaultValue = "MALE") String gender,
+            @RequestParam String indicator,
+            @RequestParam double value,
+            @RequestParam int ageMonths) {
+        return service.calculatePercentile(standard, gender, indicator, value, ageMonths);
+    }
+
+    /** 预测生长趋势 */
     @GetMapping("/prediction")
     public Map<String, Object> getPrediction(@RequestParam(defaultValue = "12") int monthsAhead) {
         List<GrowthRecord> records = repo.findAllByOrderByRecordDateAsc();
