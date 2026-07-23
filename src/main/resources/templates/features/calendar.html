@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>成长日历</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f7fa;color:#333}
+.container{max-width:800px;margin:0 auto;padding:20px}
+h1{font-size:1.4rem;color:#2c3e50;text-align:center;margin-bottom:15px}
+.nav{text-align:center;margin-bottom:15px}
+.nav a{color:#3498db;text-decoration:none;font-size:.85rem;margin:0 8px}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px;margin-bottom:15px}
+.ctrl{display:flex;justify-content:center;align-items:center;gap:15px;margin-bottom:15px}
+.ctrl button{padding:6px 14px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+.ctrl button:hover{background:#f0f0f0}
+.ctrl .ym{font-size:1.1rem;font-weight:600;min-width:120px;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-header{text-align:center;padding:6px;font-size:.78rem;color:#999;font-weight:600}
+.cal-day{aspect-ratio:1;border-radius:6px;background:#f8f9fa;padding:4px;font-size:.78rem;cursor:pointer;position:relative;overflow:hidden;min-height:60px}
+.cal-day:hover{background:#e8f0fe}
+.cal-day .day-num{font-weight:600;margin-bottom:2px}
+.cal-day .evt{font-size:.6rem;padding:1px 3px;border-radius:2px;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evt-growth{background:#d4edda;color:#155724}
+.evt-sickness{background:#f8d7da;color:#721c24}
+.evt-supplement{background:#fff3cd;color:#856404}
+.cal-day.today{background:#e8f0fe;border:2px solid #3498db}
+.cal-day.other-month{opacity:.3}
+.event-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin:0 1px}
+</style></head>
+<body>
+<div class="container">
+<div class="nav">
+<a href="/">📏 成长记录</a> <a href="/health">🏥 健康管理</a> <a href="/features/milestones">🎯 里程碑</a>
+</div>
+<h1>📅 成长日历</h1>
+<div class="ctrl">
+<button onclick="changeMonth(-1)">‹ 上月</button>
+<span class="ym" id="ymDisplay"></span>
+<button onclick="changeMonth(1)">下月 ›</button>
+</div>
+<div class="card">
+<div class="cal-grid" id="calGrid">
+<div class="cal-header">日</div><div class="cal-header">一</div><div class="cal-header">二</div><div class="cal-header">三</div><div class="cal-header">四</div><div class="cal-header">五</div><div class="cal-header">六</div>
+</div>
+</div>
+<div class="card" id="dayDetail" style="display:none">
+<h2 id="dayTitle"></h2>
+<div id="dayEvents"></div>
+</div>
+</div>
+<script>
+var curYear, curMonth;
+function changeMonth(delta) { curMonth += delta; if (curMonth > 12) { curMonth=1; curYear++; } if (curMonth < 1) { curMonth=12; curYear--; } renderCalendar(); }
+
+async function renderCalendar() {
+    if (!curYear) { var now = new Date(); curYear=now.getFullYear(); curMonth=now.getMonth()+1; }
+    document.getElementById('ymDisplay').textContent = curYear+'年'+curMonth+'月';
+
+    var resp = await fetch('/api/features/calendar/1?year='+curYear+'&month='+curMonth);
+    var data = await resp.json();
+    var events = data.events || [];
+
+    var grid = document.getElementById('calGrid');
+    grid.innerHTML = '<div class="cal-header">日</div><div class="cal-header">一</div><div class="cal-header">二</div><div class="cal-header">三</div><div class="cal-header">四</div><div class="cal-header">五</div><div class="cal-header">六</div>';
+
+    var first = new Date(curYear, curMonth-1, 1);
+    var last = new Date(curYear, curMonth, 0);
+    var startDow = first.getDay();
+    var today = new Date();
+    var todayStr = today.getFullYear()+'-'+(today.getMonth()+1).toString().padStart(2,'0')+'-'+today.getDate().toString().padStart(2,'0');
+
+    for (var i = 0; i < startDow; i++) {
+        var prevD = new Date(curYear, curMonth-1, -startDow + 1 + i);
+        grid.innerHTML += '<div class="cal-day other-month"><div class="day-num">'+prevD.getDate()+'</div></div>';
+    }
+
+    for (var d = 1; d <= last.getDate(); d++) {
+        var dateStr = curYear+'-'+curMonth.toString().padStart(2,'0')+'-'+d.toString().padStart(2,'0');
+        var isToday = dateStr === todayStr;
+        var dayEvents = events.filter(function(e){return e.date === dateStr});
+
+        var html = '<div class="cal-day'+(isToday?' today':'')+'" onclick="showDay(\''+dateStr+'\')">';
+        html += '<div class="day-num">'+d+'</div>';
+        dayEvents.forEach(function(e) {
+            html += '<div class="evt evt-'+e.type+'">'+e.title+'</div>';
+        });
+        html += '</div>';
+        grid.innerHTML += html;
+    }
+
+    var remaining = 7 - ((startDow + last.getDate()) % 7);
+    if (remaining < 7) {
+        for (var i = 1; i < remaining+1; i++) {
+            grid.innerHTML += '<div class="cal-day other-month"><div class="day-num">'+i+'</div></div>';
+        }
+    }
+}
+
+function showDay(dateStr) {
+    document.getElementById('dayDetail').style.display = 'block';
+    document.getElementById('dayTitle').textContent = dateStr;
+    // Reload events to get detail for this day
+    fetch('/api/features/calendar/1?year='+curYear+'&month='+curMonth).then(function(r){return r.json()}).then(function(data){
+        var dayEvents = data.events.filter(function(e){return e.date === dateStr});
+        var html = '';
+        dayEvents.forEach(function(e){
+            var icon = e.type==='growth'?'📏':(e.type==='sickness'?'🤒':'💊');
+            html += '<div style="padding:8px;margin:4px 0;background:#f8f9fa;border-radius:4px">'+icon+' '+e.title+'</div>';
+        });
+        document.getElementById('dayEvents').innerHTML = html || '<p class="text-muted">这一天没有记录</p>';
+    });
+}
+
+renderCalendar();
+</script>
+</body></html>

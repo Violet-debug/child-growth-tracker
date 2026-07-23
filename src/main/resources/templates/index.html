@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>宝贝成长记录</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f7fa;color:#333;line-height:1.6}
@@ -174,13 +174,8 @@ async function calcPercentile(indicator, value, ageMonths) {
 }
 
 // 更新表格百分位列
-async function updatePercentiles() {
+function updatePercentiles() {
     var rows = document.querySelectorAll('#recordBody tr');
-    var s = currentStandard();
-    var g = currentGender();
-    var hi, wi, ci;
-    if (s === 'CN_2022') { hi='LFA'; wi='WFA'; ci='HCA'; }
-    else { hi='height'; wi='weight'; ci='headCircumference'; }
     for (var i = 0; i < rows.length; i++) {
         var tds = rows[i].querySelectorAll('td');
         if (tds.length < 7) continue;
@@ -190,28 +185,15 @@ async function updatePercentiles() {
         var headTxt = tds[4].textContent.trim();
         var pctCell = tds[5];
         if (!pctCell || dateTxt === '-' || heightTxt === '-') continue;
+
         var age = calcMonthAge(dateTxt);
         if (isNaN(age)) continue;
-        var results = [];
-        if (heightTxt !== '-') {
-            try { var r = await (await fetch('/api/standards/percentile?standard='+s+'&gender='+g+'&indicator='+hi+'&value='+parseFloat(heightTxt)+'&ageMonths='+age)).json();
-                if (r.percentile) results.push('<span style="color:#2ecc71">H:'+r.percentile.toFixed(1)+'%</span>');
-                else if (r.approxPercentile) results.push('<span style="color:#2ecc71">H:'+r.approxPercentile.toFixed(1)+'%</span>');
-            } catch(e) {}
-        }
-        if (weightTxt !== '-') {
-            try { var r = await (await fetch('/api/standards/percentile?standard='+s+'&gender='+g+'&indicator='+wi+'&value='+parseFloat(weightTxt)+'&ageMonths='+age)).json();
-                if (r.percentile) results.push('<span style="color:#e67e22">W:'+r.percentile.toFixed(1)+'%</span>');
-                else if (r.approxPercentile) results.push('<span style="color:#e67e22">W:'+r.approxPercentile.toFixed(1)+'%</span>');
-            } catch(e) {}
-        }
-        if (headTxt && headTxt !== '-') {
-            try { var r = await (await fetch('/api/standards/percentile?standard='+s+'&gender='+g+'&indicator='+ci+'&value='+parseFloat(headTxt)+'&ageMonths='+age)).json();
-                if (r.percentile) results.push('<span style="color:#3498db">C:'+r.percentile.toFixed(1)+'%</span>');
-                else if (r.approxPercentile) results.push('<span style="color:#3498db">C:'+r.approxPercentile.toFixed(1)+'%</span>');
-            } catch(e) {}
-        }
-        pctCell.innerHTML = results.join(' ') || '-';
+
+        var parts = [];
+        if (heightTxt !== '-') parts.push('H:' + parseFloat(heightTxt).toFixed(1));
+        if (weightTxt !== '-') parts.push('W:' + parseFloat(weightTxt).toFixed(1));
+        if (headTxt && headTxt !== '-') parts.push('C:' + parseFloat(headTxt).toFixed(1));
+        pctCell.textContent = parts.join(' | ');
         pctCell.style.fontSize = '.75rem';
     }
 }
@@ -287,8 +269,8 @@ async function refreshPrediction() {
 }
 
 // === 页面加载 ===
-renderChart('height');
 updatePercentiles();
+renderChart('height');
 </script>
 </body>
 </html>

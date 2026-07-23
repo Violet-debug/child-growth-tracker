@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发育里程碑</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f7fa;color:#333}
+.container{max-width:900px;margin:0 auto;padding:20px}
+h1{font-size:1.4rem;color:#2c3e50;text-align:center;margin-bottom:15px}
+.nav{text-align:center;margin-bottom:15px}
+.nav a{color:#3498db;text-decoration:none;font-size:.85rem;margin:0 8px}
+.nav a:hover{text-decoration:underline}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px;margin-bottom:15px}
+.card h2{font-size:1rem;color:#555;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:8px}
+.legend{display:flex;gap:15px;margin-bottom:12px;font-size:.82rem}
+.legend span{padding:3px 8px;border-radius:4px}
+.legend .done{background:#d4edda;color:#155724}
+.legend .pending{background:#fff3cd;color:#856404}
+.legend .future{background:#e2e3e5;color:#383d41}
+.cat-header{margin:12px 0 6px;font-weight:600;font-size:.85rem;color:#555}
+.milestone-item{display:flex;align-items:center;padding:8px 12px;margin:3px 0;border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .15s}
+.milestone-item:hover{background:#f0f7ff}
+.milestone-item.done{background:#d4edda;border-left:3px solid #28a745}
+.milestone-item.pending{background:#fff3cd;border-left:3px solid #ffc107}
+.milestone-item.future{background:#f8f9fa;border-left:3px solid #adb5bd;color:#999}
+.milestone-item .cb{width:22px;height:22px;border-radius:4px;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;margin-right:12px;flex-shrink:0}
+.milestone-item.done .cb{background:#28a745;border-color:#28a745;color:#fff}
+.milestone-item.pending .cb{border-color:#ffc107}
+.milestone-item .month{background:#e9ecef;padding:2px 6px;border-radius:3px;font-size:.75rem;margin-right:10px;white-space:nowrap}
+.milestone-item .cat-tag{font-size:.72rem;padding:1px 5px;border-radius:3px;margin-right:8px;white-space:nowrap}
+.cat-MOTOR{background:#cce5ff;color:#004085}
+.cat-FINE_MOTOR{background:#d4edda;color:#155724}
+.cat-LANGUAGE{background:#fff3cd;color:#856404}
+.cat-SOCIAL{background:#f8d7da;color:#721c24}
+.stat{display:flex;gap:20px;justify-content:center;text-align:center;padding:8px 0}
+.stat-num{font-size:1.8rem;font-weight:700;color:#3498db}
+.stat-label{font-size:.75rem;color:#888}
+.progress-bar{height:8px;background:#e9ecef;border-radius:4px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;background:#28a745;border-radius:4px;transition:width .5s}
+</style></head>
+<body>
+<div class="container">
+<div class="nav">
+<a href="/">📏 成长记录</a> <a href="/health">🏥 健康管理</a>
+</div>
+<h1>🎯 发育里程碑</h1>
+<div class="card">
+<div id="stats"><div class="stat"><div><div class="stat-num" id="doneCount">0</div><div class="stat-label">已达成</div></div><div><div class="stat-num" id="totalCount">0</div><div class="stat-label">里程碑总数</div></div></div>
+<div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+</div>
+<div class="legend">
+<span class="done">✅ 已达成</span><span class="pending">⏳ 待完成</span><span class="future">🔮 未到月龄</span>
+</div>
+<div id="milestoneList"></div>
+</div>
+<script>
+async function loadMilestones() {
+    try {
+        var resp = await fetch('/api/features/milestones/1');
+        var data = await resp.json();
+        var total = data.length;
+        var done = data.filter(function(m){return m.achieved}).length;
+        document.getElementById('doneCount').textContent = done;
+        document.getElementById('totalCount').textContent = total;
+        document.getElementById('progressFill').style.width = total > 0 ? (done/total*100) + '%' : '0%';
+
+        var catLabels = {MOTOR:'大运动',FINE_MOTOR:'精细运动',LANGUAGE:'语言',SOCIAL:'社交'};
+        var cats = ['MOTOR','FINE_MOTOR','LANGUAGE','SOCIAL'];
+        var container = document.getElementById('milestoneList');
+        container.innerHTML = '';
+
+        cats.forEach(function(cat) {
+            var items = data.filter(function(m){return m.category === cat}).sort(function(a,b){return a.expectMonth-b.expectMonth});
+            if (items.length === 0) return;
+            var html = '<div class="cat-header">'+catLabels[cat]+' ('+items.length+')</div>';
+            items.forEach(function(m) {
+                var cls = m.achieved ? 'done' : (m.overdue ? 'pending' : 'future');
+                var check = m.achieved ? '✓' : '';
+                html += '<div class="milestone-item '+cls+'" onclick="toggleMilestone('+m.id+')">';
+                html += '<div class="cb">'+check+'</div>';
+                html += '<span class="month">'+m.expectMonth+'个月</span>';
+                html += '<span class="cat-tag cat-'+m.category+'">'+catLabels[m.category]+'</span>';
+                html += '<span>'+m.description+'</span>';
+                if (m.achievedDate) html += '<span style="margin-left:auto;font-size:.75rem;color:#999">'+m.achievedDate+'</span>';
+                html += '</div>';
+            });
+            container.innerHTML += html;
+        });
+    } catch(e) { document.getElementById('milestoneList').innerHTML = '<p class="text-center text-muted">加载失败</p>'; }
+}
+
+async function toggleMilestone(id) {
+    try {
+        await fetch('/api/features/milestones/'+id+'/toggle', {method:'PUT'});
+        loadMilestones();
+    } catch(e) { alert('操作失败'); }
+}
+
+loadMilestones();
+</script>
+</body></html>
