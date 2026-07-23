@@ -41,9 +41,19 @@
 <body>
 <div class="container">
     <h1>宝贝成长记录</h1>
-    <div style="text-align:center;margin-bottom:15px"><a href="/health" style="color:#27ae60;text-decoration:none;font-size:.9rem">🏥 健康管理 →</a></div>
+    <div style="text-align:center;margin-bottom:15px;display:flex;flex-wrap:wrap;justify-content:center;gap:10px"><a href="/health" style="color:#27ae60;text-decoration:none;font-size:.85rem">🏥 健康</a><a href="/features/milestones" style="color:#e67e22;text-decoration:none;font-size:.85rem">🎯 里程碑</a><a href="/features/calendar" style="color:#9b59b6;text-decoration:none;font-size:.85rem">📅 日历</a></div>
 
     <div class="card">
+    <div class="card" id="trendPanel">
+        <h2>📊 趋势洞察</h2>
+        <div id="trendList"><p class="text-muted" style="font-size:.85rem;padding:8px 0">暂无趋势（数据量不足）</p></div>
+    </div>
+
+    <div class="card" id="reminderPanel">
+        <h2>💡 提醒</h2>
+        <div id="reminderList"><p class="text-muted" style="font-size:.85rem;padding:8px 0">暂无提醒</p></div>
+    </div>
+
         <h2>添加记录</h2>
         <form th:action="@{/add}" method="post" class="form-row">
             <div class="form-group"><label>日期</label><input type="date" name="recordDate" th:value="${#dates.format(new java.util.Date(), 'yyyy-MM-dd')}" required></div>
@@ -55,7 +65,7 @@
     </div>
 
     <div class="card">
-        <h2>成长曲线</h2>
+        <h2>成长曲线 <button onclick="exportData()" style="float:right;padding:4px 12px;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.75rem">📥 导出</button></h2>
         <div class="ctrl-bar">
             <select id="standardSelect" onchange="onStandardChange()">
                 <option value="CN_2022">卫健委 WS/T 423-2022</option>
@@ -174,8 +184,13 @@ async function calcPercentile(indicator, value, ageMonths) {
 }
 
 // 更新表格百分位列
-function updatePercentiles() {
+async function updatePercentiles() {
     var rows = document.querySelectorAll('#recordBody tr');
+    var s = currentStandard();
+    var g = currentGender();
+    var hi, wi, ci;
+    if (s === 'CN_2022') { hi='LFA'; wi='WFA'; ci='HCA'; }
+    else { hi='height'; wi='weight'; ci='headCircumference'; }
     for (var i = 0; i < rows.length; i++) {
         var tds = rows[i].querySelectorAll('td');
         if (tds.length < 7) continue;
@@ -185,37 +200,55 @@ function updatePercentiles() {
         var headTxt = tds[4].textContent.trim();
         var pctCell = tds[5];
         if (!pctCell || dateTxt === '-' || heightTxt === '-') continue;
-
         var age = calcMonthAge(dateTxt);
         if (isNaN(age)) continue;
-
-        var parts = [];
-        if (heightTxt !== '-') parts.push('H:' + parseFloat(heightTxt).toFixed(1));
-        if (weightTxt !== '-') parts.push('W:' + parseFloat(weightTxt).toFixed(1));
-        if (headTxt && headTxt !== '-') parts.push('C:' + parseFloat(headTxt).toFixed(1));
-        pctCell.textContent = parts.join(' | ');
+        var results = [];
+        if (heightTxt !== '-') {
+            try { var r = await (await fetch('/api/standards/percentile?standard='+s+'&gender='+g+'&indicator='+hi+'&value='+parseFloat(heightTxt)+'&ageMonths='+age)).json();
+                var pct = r.percentile || r.approxPercentile;
+                if (pct) {
+                    var c = pct < 3 || pct > 97 ? '#e74c3c' : (pct < 10 || pct > 90 ? '#f39c12' : '#27ae60');
+                    results.push('<span style="color:'+c+';font-weight:600">H:'+pct.toFixed(1)+'%</span>');
+                }
+            } catch(e) {}
+        }
+        if (weightTxt !== '-') {
+            try { var r = await (await fetch('/api/standards/percentile?standard='+s+'&gender='+g+'&indicator='+wi+'&value='+parseFloat(weightTxt)+'&ageMonths='+age)).json();
+                var pct = r.percentile || r.approxPercentile;
+                if (pct) {
+                    var c = pct < 3 || pct > 97 ? '#e74c3c' : (pct < 10 || pct > 90 ? '#f39c12' : '#27ae60');
+                    results.push('<span style="color:'+c+';font-weight:600">W:'+pct.toFixed(1)+'%</span>');
+                }
+            } catch(e) {}
+        }
+        if (headTxt && headTxt !== '-') {
+            try { var r = await (await fetch('/api/standards/percentile?standard='+s+'&gender='+g+'&indicator='+ci+'&value='+parseFloat(headTxt)+'&ageMonths='+age)).json();
+                var pct = r.percentile || r.approxPercentile;
+                if (pct) {
+                    var c = pct < 3 || pct > 97 ? '#e74c3c' : (pct < 10 || pct > 90 ? '#f39c12' : '#27ae60');
+                    results.push('<span style="color:'+c+';font-weight:600">C:'+pct.toFixed(1)+'%</span>');
+                }
+            } catch(e) {}
+        }
+        pctCell.innerHTML = results.join(' ') || '-';
         pctCell.style.fontSize = '.75rem';
     }
 }
 
-// === 图表演示 ===
-async function renderChart(view) {
+
+async function renderChart(view) { console.log('renderChart called, view='+view+', records='+records.length);
     var ctx = document.getElementById('growthChart').getContext('2d');
     if (chart) chart.destroy();
     curView = view;
-
     var fields = {height:'height', weight:'weight', head:'headCircumference'};
     var field = fields[view];
-    var label = view==='height'?'身高(cm)':view==='weight'?'体重(kg)':'头围(cm)';
-
+    var label = view==='height'?'\u8eab\u9ad8(cm)':view==='weight'?'\u4f53\u91cd(kg)':'\u5934\u56f4(cm)';
     var standardsData = await loadStandardsData();
     if (!standardsData || !standardsData[field]) { return; }
-
     var s = standardsData[field];
     var d3 = s.map(function(p){return {x:p.monthAge, y:p.p3};});
     var d50 = s.map(function(p){return {x:p.monthAge, y:p.p50};});
     var d97 = s.map(function(p){return {x:p.monthAge, y:p.p97};});
-
     var child = [];
     for (var i = 0; i < records.length; i++) {
         var a = calcMonthAge(records[i].recordDate);
@@ -223,35 +256,32 @@ async function renderChart(view) {
         if (v != null && !isNaN(a)) child.push({x:a, y:v});
     }
     child.sort(function(a,b){return a.x-b.x;});
-
-    // 获取预测数据
     var pm = parseInt(document.getElementById('predictMonths').value) || 12;
     var predResp, pp = [];
     try { predResp = await fetch('/api/standards/prediction?monthsAhead=' + pm); if (predResp.ok) { var pd = await predResp.json(); if (pd[field] && pd[field].predicted) pp = pd[field].predicted.map(function(p){return {x:p.monthAge,y:p.value};}); } } catch(e) {}
-
     var ds = [
-        {label:'P97 上限', data:d97, borderColor:'rgba(231,76,60,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:false},
-        {label:'P50 中位数', data:d50, borderColor:'rgba(46,204,113,0.5)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'},
-        {label:'P3 下限', data:d3, borderColor:'rgba(52,152,219,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'}
+        {label:'P97 \u4e0a\u9650', data:d97, borderColor:'rgba(231,76,60,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:false},
+        {label:'P50 \u4e2d\u4f4d\u6570', data:d50, borderColor:'rgba(46,204,113,0.5)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'},
+        {label:'P3 \u4e0b\u9650', data:d3, borderColor:'rgba(52,152,219,0.3)', borderDash:[4,4], pointRadius:0, tension:0.3, fill:'-1'}
     ];
-    if (child.length > 0) ds.push({label:'宝宝 '+label, data:child, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.15)', pointBackgroundColor:'#e74c3c', pointRadius:5, tension:0.3, fill:false, borderWidth:2.5});
-    if (pp.length > 0) ds.push({label:'预测趋势', data:pp, borderColor:'#9b59b6', borderDash:[8,4], pointRadius:4, pointStyle:'rectRot', tension:0.3, fill:false, borderWidth:2});
-
+    if (child.length > 0) ds.push({label:'\u5b9d\u5b9d '+label, data:child, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.15)', pointBackgroundColor:'#e74c3c', pointRadius:5, tension:0.3, fill:false, borderWidth:2.5});
+    if (pp.length > 0) ds.push({label:'\u9884\u6d4b\u8d8b\u52bf', data:pp, borderColor:'#9b59b6', borderDash:[8,4], pointRadius:4, pointStyle:'rectRot', tension:0.3, fill:false, borderWidth:2});
     var maxX = 72;
     if (child.length > 0) maxX = Math.max(maxX, child[child.length-1].x + 12);
     if (pp.length > 0) maxX = Math.max(maxX, pp[pp.length-1].x);
-
+    try {
     chart = new Chart(ctx, {
         type:'line', data:{datasets:ds},
         options:{
             responsive:true, maintainAspectRatio:false,
             plugins:{legend:{position:'top', labels:{usePointStyle:true, padding:15, font:{size:11}}}},
             scales:{
-                x:{type:'linear', title:{display:true, text:'月龄', font:{size:12}}, ticks:{maxTicksLimit:18, callback:function(v){return v+'个月';}}, min:0, max:Math.max(maxX, 36)},
+                x:{type:'linear', title:{display:true, text:'\u6708\u9f84', font:{size:12}}, ticks:{maxTicksLimit:18, callback:function(v){return v+'\u4e2a\u6708';}}, min:0, max:Math.max(maxX, 36)},
                 y:{title:{display:true, text:label, font:{size:12}}, beginAtZero:false}
             }
         }
     });
+    } catch(e) { console.error('Chart creation failed:', e); }
 }
 
 function switchChart(v) {
@@ -268,9 +298,52 @@ async function refreshPrediction() {
     renderChart(curView);
 }
 
+var childId = 1;
+
 // === 页面加载 ===
-updatePercentiles();
 renderChart('height');
+updatePercentiles();
+loadReminders();
+loadTrends();
+
+async function loadReminders() {
+    try {
+        var r = await(await fetch('/api/features/reminders/1')).json();
+        if (r.length === 0) return;
+        document.getElementById('reminderPanel').style.display = 'block';
+        var html = '';
+        r.forEach(function(i) {
+            var icon = i.priority==='high'?'🔴':(i.priority==='medium'?'🟡':'🟢');
+            html += '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0">'+icon+' '+i.message+'</div>';
+        });
+        document.getElementById('reminderList').innerHTML = html;
+    } catch(e) {}
+}
+
+async function loadTrends() {
+    try {
+        var r = await(await fetch('/api/features/trends/1')).json();
+        if (r.length === 0) return;
+        document.getElementById('trendPanel').style.display = 'block';
+        var html = '';
+        r.forEach(function(t) {
+            var icon = t.level==='warn'?'⚠️':'ℹ️';
+            html += '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0">'+icon+' '+t.message+'</div>';
+        });
+        document.getElementById('trendList').innerHTML = html;
+    } catch(e) {}
+}
+
+async function exportData() {
+    try {
+        var r = await(await fetch('/api/features/export/1')).json();
+        var blob = new Blob([JSON.stringify(r, null, 2)], {type:'application/json'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = '成长记录_'+new Date().toISOString().slice(0,10)+'.json';
+        a.click();
+    } catch(e) { alert('导出失败'); }
+}
 </script>
 </body>
 </html>
